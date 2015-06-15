@@ -16,6 +16,30 @@ module Jekyll
       end
 
       pv = site.config['page-view']
+      pv['key_file'] = pv['key_file']||'client.p12'
+      pv['key_secret'] = pv['key_secret']||'notasecret'
+      pv['start'] = pv['start']||'1 month ago'
+      pv['end'] = pv['end']||'now'
+      pv['metric'] = pv['metric']||'ga:pageviews'
+      pv['segment'] = pv['segment']||'gaid::-1'
+      pv['filters'] = pv['filters']||nil
+
+      if pv['start'].is_a? String
+        pv['start'] = [pv['start']]
+      end
+      if pv['end'].is_a? String
+        pv['end'] = [pv['end']]
+      end
+      if pv['end'].size < pv['start'].size
+        for i in (pv['end'].size)..(pv['start'].size-1)
+          pv['end'][i] = pv['end'][0]
+        end
+      end
+      pv['name'] = []
+      for i in 0..(pv['start'].size-1)
+        pv['name'][i] = '_pv_' + pv['start'][i].gsub(' ', '-')+'-to-'+pv['end'][i].gsub(' ','-')
+      end
+
       client = Google::APIClient.new(
         :application_name => 'octopress-page-view',
         :application_version => '1.0',
@@ -34,44 +58,37 @@ module Jekyll
       client.authorization.fetch_access_token!
       analytics = client.discovered_api('analytics','v3')
 
-      params = {
-        'ids' => pv['profileID'],
-        'start-date' => Chronic.parse(pv['start']).strftime("%Y-%m-%d"),
-        'end-date' => Chronic.parse(pv['end']).strftime("%Y-%m-%d"),
-        'dimensions' => "ga:pagePath",
-        'metrics' => pv['metric'],
-        'max-results' => 100000,
-      }
-      if pv['segment']
-        params['segment'] = pv['segment']
+      for i in 0..(pv['start'].size-1)
+        params = {
+          'ids' => pv['profileID'],
+          'start-date' => Chronic.parse(pv['start'][i]).strftime("%Y-%m-%d"),
+          'end-date' => Chronic.parse(pv['end'][i]).strftime("%Y-%m-%d"),
+          'dimensions' => "ga:pagePath",
+          'metrics' => pv['metric'],
+          'max-results' => 100000,
+        }
+        if pv['segment']
+          params['segment'] = pv['segment']
+        end
+        if pv['filters']
+          params['filters'] = pv['filters']
+        end
+
+        response = client.execute(:api_method => analytics.data.ga.get, :parameters => params)
+        results = Hash[response.data.rows]
+
+        site.config[pv['name'][i]] = 0
+
+        (site.posts + site.pages).each { |page|
+          url = (site.config['baseurl'] || '') + page.url
+          hits = (results[url])? results[url].to_i : 0
+          page.data.merge!(pv['name'][i] => hits)
+          site.config[pv['name'][i]] += hits
+          if i == 0
+            page.data.merge!("_pv" => hits)
+          end
+        }
       end
-      if pv['filters']
-        params['filters'] = pv['filters']
-      end
-
-      response = client.execute(:api_method => analytics.data.ga.get, :parameters => params)
-      results = Hash[response.data.rows]
-
-      tot = 0
-      # display per post page view
-      site.posts.each { |post|
-        url = (site.config['baseurl'] || '') + post.url + 'index.html'
-        hits = (results[url])? results[url].to_i : 0
-        post.data.merge!("_pv" => hits)
-        tot += hits
-      }
-
-      # calculate total page view
-      site.pages.each { |page|
-        url = (site.config['baseurl'] || '') + page.url
-        hits = (results[url])? results[url].to_i : 0
-        tot += hits
-      }
-
-      # display total page view in page
-      site.pages.each { |page|
-        page.data.merge!("_pv" => tot)
-      }
     end
   end
 
