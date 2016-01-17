@@ -1,7 +1,9 @@
 require 'jekyll'
 require 'jekyll/post'
 require 'rubygems'
-require 'google/api_client'
+require 'googleauth'
+require 'google/apis/analytics_v3'
+require 'google/api_client/auth/key_utils'
 require 'chronic'
 
 module Jekyll
@@ -40,42 +42,35 @@ module Jekyll
         pv['name'][i] = '_pv_' + pv['start'][i].gsub(' ', '-')+'-to-'+pv['end'][i].gsub(' ','-')
       end
 
-      client = Google::APIClient.new(
-        :application_name => 'octopress-page-view',
-        :application_version => '1.0',
-      )
-
       # Load our credentials for the service account
       key = Google::APIClient::KeyUtils.load_from_pkcs12(pv['key_file'], pv['key_secret'])
-      client.authorization = Signet::OAuth2::Client.new(
+      authorization = Signet::OAuth2::Client.new(
         :token_credential_uri => 'https://accounts.google.com/o/oauth2/token',
         :audience => 'https://accounts.google.com/o/oauth2/token',
-        :scope => 'https://www.googleapis.com/auth/analytics.readonly',
+        :scope=> Google::Apis::AnalyticsV3::AUTH_ANALYTICS_READONLY,
         :issuer => pv['service_account_email'],
         :signing_key => key)
 
       # Request a token for our service account
-      client.authorization.fetch_access_token!
-      analytics = client.discovered_api('analytics','v3')
+      authorization.fetch_access_token!
+
+      # Analytics service
+      service = Google::Apis::AnalyticsV3::AnalyticsService.new
+      service.authorization = authorization
+
 
       for i in 0..(pv['start'].size-1)
-        params = {
-          'ids' => pv['profileID'],
-          'start-date' => Chronic.parse(pv['start'][i]).strftime("%Y-%m-%d"),
-          'end-date' => Chronic.parse(pv['end'][i]).strftime("%Y-%m-%d"),
-          'dimensions' => "ga:pagePath",
-          'metrics' => pv['metric'],
-          'max-results' => 100000,
-        }
-        if pv['segment']
-          params['segment'] = pv['segment']
-        end
-        if pv['filters']
-          params['filters'] = pv['filters']
-        end
-
-        response = client.execute(:api_method => analytics.data.ga.get, :parameters => params)
-        results = Hash[response.data.rows]
+        response = service.get_ga_data(
+          pv['profileID'],
+          Chronic.parse(pv['start'][i]).strftime("%Y-%m-%d"),
+          Chronic.parse(pv['end'][i]).strftime("%Y-%m-%d"),
+          pv['metric'],
+          dimensions: "ga:pagePath",
+          max_results: 100000,
+          segment: pv['segment'],
+          filters: pv['filters']
+        )
+        results = Hash[response.rows]
 
         site.config[pv['name'][i]] = 0
 
