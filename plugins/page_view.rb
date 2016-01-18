@@ -41,9 +41,12 @@ module Jekyll
         pv['name'][i] = '_pv_' + pv['start'][i].gsub(' ', '-')+'-to-'+pv['end'][i].gsub(' ','-')
       end
 
+      # Analytics service
+      service = Google::Apis::AnalyticsV3::AnalyticsService.new
+
       # Load our credentials for the service account
       key = Google::APIClient::KeyUtils.load_from_pkcs12(pv['key_file'], pv['key_secret'])
-      authorization = Signet::OAuth2::Client.new(
+      service.authorization = Signet::OAuth2::Client.new(
         :token_credential_uri => 'https://accounts.google.com/o/oauth2/token',
         :audience => 'https://accounts.google.com/o/oauth2/token',
         :scope=> Google::Apis::AnalyticsV3::AUTH_ANALYTICS_READONLY,
@@ -51,12 +54,7 @@ module Jekyll
         :signing_key => key)
 
       # Request a token for our service account
-      authorization.fetch_access_token!
-
-      # Analytics service
-      service = Google::Apis::AnalyticsV3::AnalyticsService.new
-      service.authorization = authorization
-
+      service.authorization.fetch_access_token!
 
       for i in 0..(pv['start'].size-1)
         response = service.get_ga_data(
