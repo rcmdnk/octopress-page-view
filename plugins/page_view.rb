@@ -1,7 +1,6 @@
 require 'jekyll'
 require 'jekyll/post'
 require 'rubygems'
-require 'googleauth'
 require 'google/apis/analytics_v3'
 require 'google/api_client/auth/key_utils'
 require 'chronic'
