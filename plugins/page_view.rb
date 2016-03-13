@@ -17,7 +17,11 @@ module Jekyll
       end
 
       pv = site.config['page-view']
-      pv['key_file'] = pv['key_file']||'client.p12'
+
+      if !pv['key_file']
+        return
+      end
+      pv['key_file'] = pv['key_file']
       pv['key_secret'] = pv['key_secret']||'notasecret'
       pv['start'] = pv['start']||'1 month ago'
       pv['end'] = pv['end']||'now'
