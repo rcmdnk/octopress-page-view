@@ -76,7 +76,11 @@ module Jekyll
         site.config[pv['name'][i]] = 0
 
         (site.posts + site.pages).each { |page|
-          url = (site.config['baseurl'] || '') + page.url
+          root = site.config['root']
+          if root =~/(.+)\/$|^\/$/
+            root = $1
+          end
+          url = root + page.url
           hits = (results[url])? results[url].to_i : 0
           page.data.merge!(pv['name'][i] => hits)
           site.config[pv['name'][i]] += hits
