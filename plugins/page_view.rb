@@ -80,7 +80,11 @@ module Jekyll
           if root =~/(.+)\/$|^\/$/
             root = $1
           end
-          url = root + page.url
+          if root == nil
+            url = page.url
+          else
+            url = root + page.url
+          end
           hits = (results[url])? results[url].to_i : 0
           page.data.merge!(pv['name'][i] => hits)
           site.config[pv['name'][i]] += hits
