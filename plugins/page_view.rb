@@ -1,5 +1,4 @@
 require 'jekyll'
-require 'jekyll/post'
 require 'rubygems'
 require 'google/apis/analytics_v3'
 require 'google/api_client/auth/key_utils'
@@ -75,7 +74,7 @@ module Jekyll
 
         site.config[pv['name'][i]] = 0
 
-        (site.posts + site.pages).each { |page|
+        (site.posts.docs + site.pages).each { |page|
           root = site.config['root']
           if root =~/(.+)\/$|^\/$/
             root = $1
