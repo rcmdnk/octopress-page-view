@@ -1,7 +1,6 @@
 require 'jekyll'
 require 'rubygems'
-require 'google/apis/analytics_v3'
-require 'google/api_client/auth/key_utils'
+require "google/analytics/data"
 require 'chronic'
 
 module Jekyll
@@ -17,16 +16,16 @@ module Jekyll
 
       pv = site.config['page-view']
 
-      if !pv['key_file']
+      if !pv['credential']
+        puts "page-view warning: set page-view.credential"
         return
       end
-      pv['key_file'] = pv['key_file']
-      pv['key_secret'] = pv['key_secret']||'notasecret'
-      pv['start'] = pv['start']||'1 month ago'
+      if !pv['property_id']
+        puts "page-view warning: set page-view.property_id"
+        return
+      end
+      pv['start'] = pv['start']||'30daysAgo'
       pv['end'] = pv['end']||'now'
-      pv['metric'] = pv['metric']||'ga:pageviews'
-      pv['segment'] = pv['segment']||'gaid::-1'
-      pv['filters'] = pv['filters']||nil
 
       if pv['start'].is_a? String
         pv['start'] = [pv['start']]
@@ -44,33 +43,25 @@ module Jekyll
         pv['name'][i] = '_pv_' + pv['start'][i].gsub(' ', '-')+'-to-'+pv['end'][i].gsub(' ','-')
       end
 
-      # Analytics service
-      service = Google::Apis::AnalyticsV3::AnalyticsService.new
-
-      # Load our credentials for the service account
-      key = Google::APIClient::KeyUtils.load_from_pkcs12(pv['key_file'], pv['key_secret'])
-      service.authorization = Signet::OAuth2::Client.new(
-        :token_credential_uri => 'https://accounts.google.com/o/oauth2/token',
-        :audience => 'https://accounts.google.com/o/oauth2/token',
-        :scope=> Google::Apis::AnalyticsV3::AUTH_ANALYTICS_READONLY,
-        :issuer => pv['service_account_email'],
-        :signing_key => key)
-
-      # Request a token for our service account
-      service.authorization.fetch_access_token!
+      client = Google::Analytics::Data.analytics_data do |config|
+          config.credentials = pv['credential']
+      end
 
       for i in 0..(pv['start'].size-1)
-        response = service.get_ga_data(
-          pv['profileID'],
-          Chronic.parse(pv['start'][i]).strftime("%Y-%m-%d"),
-          Chronic.parse(pv['end'][i]).strftime("%Y-%m-%d"),
-          pv['metric'],
-          dimensions: "ga:pagePath",
-          max_results: 100000,
-          segment: pv['segment'],
-          filters: pv['filters']
+        request = Google::Analytics::Data::V1beta::RunReportRequest.new(
+          property: "properties/#{pv["property_id"]}",
+          dimensions: [Google::Analytics::Data::V1beta::Dimension.new(name: "pagePath")],
+          metrics: [Google::Analytics::Data::V1beta::Metric.new(name: "screenPageViews")],
+          date_ranges: [Google::Analytics::Data::V1beta::DateRange.new(start_date: pv['start'][i], end_date: pv['end'][i])]
         )
-        results = Hash[response.rows]
+        response = client.run_report(request)
+
+        results = {}
+        response.rows.each do |row|
+          page_path = row.dimension_values.first.value
+          views = row.metric_values.first.value
+          results[page_path] = views
+        end
 
         site.config[pv['name'][i]] = 0
 
