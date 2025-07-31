@@ -52,7 +52,8 @@ module Jekyll
           property: "properties/#{pv["property_id"]}",
           dimensions: [Google::Analytics::Data::V1beta::Dimension.new(name: "pagePath")],
           metrics: [Google::Analytics::Data::V1beta::Metric.new(name: "screenPageViews")],
-          date_ranges: [Google::Analytics::Data::V1beta::DateRange.new(start_date: pv['start'][i], end_date: pv['end'][i])]
+          date_ranges: [Google::Analytics::Data::V1beta::DateRange.new(start_date: pv['start'][i], end_date: pv['end'][i])],
+          timeout: 60
         )
         response = client.run_report(request)
 
