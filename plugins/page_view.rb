@@ -113,7 +113,11 @@ module Jekyll
         return ''
       end
 
-      html = pv.to_s.reverse.gsub(/...(?=.)/,'\&,').reverse + ' hits'
+      html = begin
+        pv.to_s.reverse.gsub(/...(?=.)/, '\&,').reverse + ' hits'
+      rescue => e
+        ''
+      end
       return html
     end #render
   end # PageViewTag
