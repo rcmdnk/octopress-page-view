@@ -54,7 +54,12 @@ module Jekyll
           metrics: [Google::Analytics::Data::V1beta::Metric.new(name: "screenPageViews")],
           date_ranges: [Google::Analytics::Data::V1beta::DateRange.new(start_date: pv['start'][i], end_date: pv['end'][i])]
         )
-        response = client.run_report(request)
+        response = begin
+          client.run_report(request)
+        rescue => e
+          puts "page-view error: #{e.message}"
+          return
+        end
 
         results = {}
         response.rows.each do |row|
